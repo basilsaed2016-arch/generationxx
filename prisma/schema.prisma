@@ -1,0 +1,150 @@
+// Prisma schema for GenerationX Roleplay
+// Note: Using SQLite in sandbox; schema is portable to PostgreSQL.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String       @id @default(cuid())
+  discordId     String       @unique
+  username      String
+  discriminator String?
+  avatar        String?
+  email         String?
+  isAdmin       Boolean      @default(false)
+  // Citizen verification (cached from Discord API at login)
+  inGuild       Boolean      @default(false)
+  verified      Boolean      @default(false)
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+  examResults   ExamResult[]
+  orders        Order[]
+}
+
+// ===== Exam =====
+model Category {
+  id        String     @id @default(cuid())
+  name      String     @unique
+  color     String     @default("#00F5D4")
+  order     Int        @default(0)
+  questions Question[]
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+}
+
+model Question {
+  id          String   @id @default(cuid())
+  text        String
+  optionA     String
+  optionB     String
+  optionC     String
+  optionD     String
+  correct     String   @default("A")
+  enabled     Boolean  @default(true)
+  order       Int      @default(0)
+  timeLimit   Int      @default(60)
+  explanation String?
+  categoryId  String?
+  category    Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model ExamResult {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  score        Int
+  total        Int
+  percentage   Int
+  passed       Boolean
+  durationSec  Int
+  answersJson  String
+  createdAt    DateTime @default(now())
+}
+
+// ===== Streamers (Kick) =====
+model Streamer {
+  id          String   @id @default(cuid())
+  name        String
+  kickSlug    String   @unique // e.g. "rayder-tv" from kick.com/rayder-tv
+  kickUrl     String
+  avatar      String?
+  description String?
+  order       Int      @default(0)
+  enabled     Boolean  @default(true)
+  // Live status (cached, refreshed by mini-service)
+  isLive      Boolean  @default(false)
+  liveTitle   String?
+  liveViewerCount Int?
+  liveCheckedAt   DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// ===== Store =====
+model ProductCategory {
+  id        String    @id @default(cuid())
+  name      String    @unique
+  slug      String    @unique
+  order     Int       @default(0)
+  products  Product[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+}
+
+model Product {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  price       Float
+  currency    String   @default("USD")
+  image       String?
+  badge       String?
+  order       Int      @default(0)
+  enabled     Boolean  @default(true)
+  categoryId  String?
+  category    ProductCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// ===== Payments =====
+model PaymentSettings {
+  id                String   @id @default(cuid())
+  paypalEmail       String?
+  bankName          String?
+  bankAccountName   String?
+  bankAccountNumber String?
+  bankIban          String?
+  bankSwift         String?
+  cardProvider      String   @default("stripe") // stripe | paymob | manual
+  cardProviderKey   String?
+  currency          String   @default("USD")
+  taxPercent        Float    @default(0)
+  enabled           Boolean  @default(true)
+  updatedAt         DateTime @updatedAt
+}
+
+model Order {
+  id          String   @id @default(cuid())
+  userId      String?
+  user        User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  productId   String
+  productName String
+  amount      Float
+  currency    String   @default("USD")
+  paymentMethod String  @default("paypal") // paypal | card | manual
+  status      String   @default("pending") // pending | paid | failed | refunded
+  customerName String?
+  customerEmail String?
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
